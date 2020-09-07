@@ -1,4 +1,4 @@
-from source.config import ADMINS
+from config import ADMINS
 
 
 def admin(func):

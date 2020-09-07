@@ -1,10 +1,9 @@
 from flask import Flask, abort, request
 from telebot import TeleBot, types
 import requests
-from source import config, decorators, models
+import config, decorators, models
 
 app = Flask(__name__)
-
 
 bot_token = config.get_token()
 url = config.get_url()
@@ -169,4 +168,3 @@ def send_to_all(message):
 
 
 bot.polling()
-print('start')

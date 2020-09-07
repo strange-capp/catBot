@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 import os
 
-from source.config import BASEDIR
+from config import BASEDIR
 
 engine = create_engine('sqlite:///' + os.path.join(BASEDIR, '../data.sqlite'),
                        echo=True, connect_args={'check_same_thread': False})
