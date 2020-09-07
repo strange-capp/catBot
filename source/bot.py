@@ -11,7 +11,7 @@ url = config.get_url()
 cats_url = 'https://api.thecatapi.com/v1/images/search'
 vote_url = 'https://api.thecatapi.com/v1/votes/?api_key=9c384300-7b15-449e-991a-205654945bce/'
 
-bot = TeleBot(bot_token, threaded=False)
+bot = TeleBot(bot_token)
 
 
 @app.route('/{}'.format(bot_token), methods=['POST'])
