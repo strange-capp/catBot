@@ -1,1 +1,1 @@
-cd source && python3 bot.py
+web: cd source && python3 bot.py
