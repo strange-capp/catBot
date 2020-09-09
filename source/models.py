@@ -8,7 +8,7 @@ from config import BASEDIR
 
 engine = create_engine(os.environ.get('DATABASE_URL') or
                        'sqlite:///' + os.path.join(BASEDIR, '../data.sqlite'),
-                       echo=True, connect_args={'check_same_thread': False})
+                       echo=True)
 
 Base = declarative_base()
 
