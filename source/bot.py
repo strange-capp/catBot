@@ -1,9 +1,6 @@
-from flask import Flask, abort, request
-from telebot import TeleBot, types
+from aiogram import Dispatcher, Bot, types, executor, dispatcher
 import requests
-import config, decorators, models
-
-app = Flask(__name__)
+import config, models
 
 bot_token = config.get_token()
 url = config.get_url()
@@ -11,33 +8,17 @@ url = config.get_url()
 cats_url = 'https://api.thecatapi.com/v1/images/search'
 vote_url = 'https://api.thecatapi.com/v1/votes/?api_key=9c384300-7b15-449e-991a-205654945bce/'
 
-bot = TeleBot(bot_token, threaded=False)
+bot = Bot(bot_token)
+dp = Dispatcher(bot)
 
-
-@app.route('/{}'.format(bot_token), methods=['POST'])
-def index():
-    if request.method == "POST":
-        json_string = request.data.decode('utf-8')
-        update = types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return 'Works'
-    else:
-        return abort(403)
-
-
-@app.route('/set_webhook', methods=['GET', 'POST'])
-def set_webhook():
-    s = bot.set_webhook('{}/{}'.format(url, bot_token), )
-    if s:
-        print(s)
-        return "webhook setup ok"
-    else:
-        return "webhook setup failed"
-
-
-@bot.message_handler(func=lambda message: 'Помощь' in message.text)
-@bot.message_handler(commands=['start', 'help'])
-def start(message):
+@dp.message_handler(
+    dispatcher.filters.builtin.Text(equals='Помощь')
+)
+@dp.message_handler(commands=['start', 'help'])
+async def start(message):
+    """
+    Sends a help message
+    """
     chat_id = message.chat.id
 
     user = models.get_user(chat_id)
@@ -52,12 +33,17 @@ def start(message):
     reply_keys.row(get_cat)
     reply_keys.row(get_help, how_to_add)
 
-    bot.send_message(chat_id, 'Просто тыкай на кнопку и наслаждайся🐈)',
-                     reply_markup=reply_keys)
+    await bot.send_message(chat_id, 'Просто тыкай на кнопку и наслаждайся🐈)',
+                           reply_markup=reply_keys)
 
 
-@bot.message_handler(func=lambda message: 'Кота мне!' in message.text)
-def give_cat(message):
+@dp.message_handler(
+    dispatcher.filters.builtin.Text(equals='Кота мне!')
+)
+async def give_cat(message):
+    """
+    Sends a cat
+    """
     chat_id = message.chat.id
 
     user = models.get_user(chat_id)
@@ -68,7 +54,7 @@ def give_cat(message):
     photo = response['url']
     image_id = response['id']
 
-    vote_markup = types.InlineKeyboardMarkup(row_width=2)
+    markup = types.InlineKeyboardMarkup(row_width=2)
 
     vote_up_button = types.InlineKeyboardButton(
         '👍',
@@ -77,10 +63,14 @@ def give_cat(message):
         '👎',
         callback_data=f'down{image_id}')
 
-    vote_markup.add(vote_up_button, vote_down_button)
+    send_photo = types.InlineKeyboardButton('Отправить всем пользователям!',
+                                            callback_data=f'send{photo}')
 
-    bot.send_photo(chat_id=chat_id, photo=photo,
-                   reply_markup=vote_markup)
+    markup.row(vote_up_button, vote_down_button)
+    markup.add(send_photo)
+
+    await bot.send_photo(chat_id=chat_id, photo=photo,
+                         reply_markup=markup)
 
     user.messages = int(user.messages) + 1 if user.messages is not None \
         else 1
@@ -88,8 +78,12 @@ def give_cat(message):
     models.session.commit()
 
 
-@bot.message_handler(func=lambda message: 'Добавить кота' in message.text)
-def add_cat(message):
+@dp.message_handler(dispatcher.filters.builtin.Text(
+    contains='Добавить кота'))
+async def add_cat(message):
+    """
+    Sends message about current state of 'Add a cat' feature
+    """
     chat_id = message.chat.id
 
     text = "Я уже начал разрабатывать" \
@@ -98,11 +92,14 @@ def add_cat(message):
            "ТЕБЕ отправить вместо кота свой нюдес, " \
            "нужно просто (не)много подождать)"
 
-    bot.send_message(chat_id, text)
+    await bot.send_message(chat_id, text)
 
 
-@bot.callback_query_handler(func=lambda call: 'up' in call.data)
-def vote_up(call):
+@dp.callback_query_handler(lambda call: 'up' in call.data)
+async def vote_up(call):
+    """
+    Sends vote_up to the thecatapi.com
+    """
     chat_id = call.message.chat.id
 
     image_id = call.data.replace('up', '')
@@ -112,11 +109,14 @@ def vote_up(call):
     response = requests.post(vote_url, json=json)
     message = response.json()['message']
     if message == 'SUCCESS':
-        bot.send_message(chat_id, 'Твой голос будет учтен!!')
+        await bot.send_message(chat_id, 'Твой голос будет учтен!!')
 
 
-@bot.callback_query_handler(func=lambda call: 'down' in call.data)
-def vote_down(call):
+@dp.callback_query_handler(lambda call: 'down' in call.data)
+async def vote_down(call):
+    """
+    Sends vote_down to the thecatapi.com
+    """
     chat_id = call.message.chat.id
 
     image_id = call.data.replace('down', '')
@@ -125,15 +125,33 @@ def vote_down(call):
 
     response = requests.post(vote_url, json=json)
     message = response.json()['message']
-    print(response.json())
     if message == 'SUCCESS':
-        bot.send_message(chat_id, 'Твой голос будет учтен..')
+        await bot.send_message(chat_id, 'Твой голос будет учтен..')
 
 
-@bot.message_handler(commands=['logs'])
-@decorators.admin
-def logs(message):
+@dp.callback_query_handler(lambda call: 'send' in call.data)
+async def resend_photo(call):
+    photo_url = call.data.replace('send', '')
+
+    current_user = models.get_user(call.message.chat.id)
+    print(models.get_all_users)
+    for i in models.get_all_users():
+        if not i.chat_id == current_user.chat_id:
+            await bot.send_photo(i.chat_id, photo=photo_url)
+
+    await bot.send_message(current_user.chat_id, 'Фотография отправлена'
+                                                 ' всем пользователям!')
+
+# for admins
+@dp.message_handler(commands=['logs'])
+async def logs(message):
+    """
+    Sends stats to the admin
+    """
     chat_id = message.chat.id
+
+    if chat_id not in config.ADMINS:
+        return
 
     users = models.get_all_users()
 
@@ -151,15 +169,17 @@ def logs(message):
 
     text += total_users + total_messages
 
-    bot.send_message(chat_id, text)
+    await bot.send_message(chat_id, text)
 
 
-@bot.message_handler(func=lambda message: 'sendToAll' in message.text)
-@decorators.admin
+@dp.message_handler(lambda message: 'sendToAll' in message.text)
 def send_to_all(message):
     """
     Sends given message to all users
     """
+    if message.chat.id not in config.ADMINS:
+        return
+
     text = message.text.replace('/sendToAll ', '')
     users = models.get_all_users()
 
@@ -167,4 +187,5 @@ def send_to_all(message):
         bot.send_message(user.chat_id, text)
 
 
-bot.polling()
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)

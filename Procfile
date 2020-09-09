@@ -1,1 +1,1 @@
-web: cd source && gunicorn bot:app
+web: cd source && python3 bot.py
