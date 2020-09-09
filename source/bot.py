@@ -7,6 +7,7 @@ from aiogram.utils import context
 from urllib.parse import urljoin
 import os
 from aiogram.dispatcher.webhook import get_new_configured_app
+from aiogram.utils.executor import start_webhook
 
 bot_token = config.get_token()
 url = config.get_url()
@@ -205,8 +206,11 @@ async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL)
 
 if __name__ == '__main__':
-    # Create aiohttp.web.Application with configured route for webhook path
-    app = get_new_configured_app(dispatcher=dp, path=WEBHOOK_URL_PATH)
-    app.on_startup.append(on_startup)
-    dp.loop.set_task_factory(context.task_factory)
-    web.run_app(app, host='0.0.0.0', port=os.getenv('PORT'))
+    start_webhook(
+        dispatcher=dp,
+        webhook_path=WEBHOOK_URL_PATH,
+        on_startup=on_startup,
+        skip_updates=True,
+        host='3.95.176.155',
+        port=os.getenv('PORT'),
+    )
