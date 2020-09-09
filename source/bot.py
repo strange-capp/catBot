@@ -1,20 +1,9 @@
 from aiogram import Dispatcher, Bot, types, executor, dispatcher
 import requests
 import config, models
-import aiohttp
-from aiohttp import web
-from aiogram.utils import context
-from urllib.parse import urljoin
-import os
-from aiogram.dispatcher.webhook import get_new_configured_app
-from aiogram.utils.executor import start_webhook
 
 bot_token = config.get_token()
 url = config.get_url()
-
-WEBHOOK_HOST = f'https://catcatcat-bot.herokuapp.com/'  # Enter here your link from Heroku project settings
-WEBHOOK_URL_PATH = '/webhook/' + bot_token
-WEBHOOK_URL = urljoin(WEBHOOK_HOST, WEBHOOK_URL_PATH)
 
 cats_url = 'https://api.thecatapi.com/v1/images/search'
 vote_url = 'https://api.thecatapi.com/v1/votes/?api_key=9c384300-7b15-449e-991a-205654945bce/'
@@ -198,19 +187,5 @@ def send_to_all(message):
         bot.send_message(user.chat_id, text)
 
 
-async def on_startup(app):
-    """
-    Simple hook for aiohttp application which manages webhook
-    """
-    await bot.delete_webhook()
-    await bot.set_webhook(WEBHOOK_URL)
-
 if __name__ == '__main__':
-    start_webhook(
-        dispatcher=dp,
-        webhook_path=WEBHOOK_URL_PATH,
-        on_startup=on_startup,
-        skip_updates=True,
-        host='3.95.176.155',
-        port=os.getenv('PORT'),
-    )
+    executor.start_polling(dp, skip_updates=True)
